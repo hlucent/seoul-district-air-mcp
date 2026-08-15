@@ -34,7 +34,7 @@ MCP SDK의 **Streamable HTTP** 전송(`StreamableHTTPServerTransport`)을 사용
 
 ## MCP 클라이언트 연결 예시
 
-Streamable HTTP를 지원하는 클라이언트에서 서버 URL(`http://localhost:8080/mcp` 또는 배포된 주소)을 등록하면 된다. 예:
+누구나 별도 인증키 없이 아래 URL만 MCP 클라이언트에 등록하면 바로 쓸 수 있다. 서울 열린데이터광장 API 인증키는 서버 운영자가 `fly secrets`로 서버에만 심어두므로, 클라이언트(시민)는 발급도 입력도 필요 없다.
 
 ```json
 {

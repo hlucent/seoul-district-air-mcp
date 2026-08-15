@@ -22,3 +22,12 @@
 - `SEOUL_API_KEY`는 코드 변경 없이 `process.env.SEOUL_API_KEY` 그대로 사용 — `fly secrets set`으로 주입하는 것을 전제로 함.
 - 로컬에서 `node dist/index.js` 실행 후 `curl /health`, `curl -X POST /mcp` (`tools/list`)로 HTTP 전송이 정상 동작함을 확인. Docker 데몬이 이 세션 샌드박스에 없어 `docker build` 자체는 테스트하지 못함 — 실제 배포 전 로컬에서 한 번 빌드 확인 권장.
 - README에 전송 방식, 로컬 실행, fly.io 최초 배포/재배포/시크릿 갱신 방법 섹션 추가.
+
+## 2026-08-15 (3차) — 시민 공개 이용 구조 점검
+
+"시민이 API 키 없이 URL만으로 접속" 요구사항 충족 여부를 코드 전체 재점검.
+
+- **인증 요구 없음**: `/mcp` 핸들러에 헤더/토큰 검사 없음. 확인 완료, 수정 없음.
+- **Rate limit 에러 처리**: 서울 열린데이터광장 실제 rate limit 코드(`ERROR-336`, 일별 트래픽 제한 초과)는 기존 정규식(`ERROR-3/5/6xx`)에 이미 걸려 시민 친화 메시지로 나감. 점검 중 별도 문제 발견 — `ERROR-4xx`(인증키 오류, 즉 서버가 심어둔 키 자체 문제)는 정규식에 안 걸려 API 원문 메시지가 그대로 노출되고 있었음. 이는 rate limit 문제는 아니지만 시민에게 서버 내부 사정(키 상태)을 노출하는 문제라 `src/api.ts`를 수정: 코드 접두사 구분 없이 `INFO-0`이 아닌 모든 RESULT.CODE를 동일하게 "일시적 오류, 잠시 후 재시도해주세요."로 단순화.
+- **동시 접속 안전성**: `handleMcpRequest`가 요청마다 `createMcpServer` + 새 `StreamableHTTPServerTransport`를 생성(stateless, `sessionIdGenerator: undefined`)하고 응답 종료 시 정리. `districts.ts`/`grades.ts`의 매핑·기준표는 읽기 전용 모듈 상수라 동시 요청 간 공유돼도 안전. 요청 간 공유되는 가변 전역 상태 없음을 재확인. 수정 없음.
+- README에 "시민은 별도 인증키 없이 이 URL만 등록하면 됨" 안내 섹션 추가.
