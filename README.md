@@ -4,6 +4,8 @@
 
 서울 열린데이터광장의 **"서울시 실시간 자치구별 대기환경 현황"** (`ListAirQualityByDistrictService`) 데이터셋 하나만 다룬다.
 
+**인증키 필요 없음 — 배포된 URL만 MCP 클라이언트에 등록하면 누구나 바로 사용할 수 있다.**
+
 ## 도구
 
 ### `get_district_air_quality`
@@ -15,26 +17,42 @@
 
 개별 오염물질 등급은 API가 제공하지 않아 환경부 통합대기환경지수(CAI) 항목별 등급 기준을 코드(`src/grades.ts`)에 상수로 고정해 계산한다.
 
-## 전송 방식
+## 사용 방법 (시민용 — 설치·빌드 불필요)
 
-MCP SDK의 **Streamable HTTP** 전송(`StreamableHTTPServerTransport`)을 사용한다. 인증 없는 공개 stateless 서버로, 요청마다 서버/트랜스포트를 새로 생성해 세션 상태를 갖지 않는다.
+서버는 fly.io에 배포되어 있다. 별도 설치, 빌드, API 키 발급 없이 아래 URL만 MCP 클라이언트에 등록하면 바로 쓸 수 있다.
 
-- MCP 엔드포인트: `POST /mcp`
-- 헬스체크: `GET /health`
-- 리스닝 포트: `PORT` 환경변수 (기본값 8080)
+```
+https://seoul-district-air-mcp.fly.dev/mcp
+```
 
-## 로컬 설정
+서울 열린데이터광장 API 인증키는 서버 운영자가 `fly secrets`로 서버에만 심어두므로, 클라이언트(시민)는 키를 발급받거나 입력할 필요가 없다.
 
-1. `.env.example`을 `.env`로 복사하고 `SEOUL_API_KEY`에 발급받은 서울 열린데이터광장 인증키를 입력한다.
-2. 의존성 설치: `npm install`
-3. 빌드: `npm run build`
-4. 실행: `npm start` (또는 개발 중에는 `npm run dev`)
+### Claude Desktop에 등록하기
 
-`.env`는 `.gitignore`에 포함되어 저장소에 커밋되지 않는다.
+Claude Desktop의 `claude_desktop_config.json`은 로컬 프로세스(`command`/`args`) 방식을 기본으로 하므로, 원격 HTTP MCP 서버는 [`mcp-remote`](https://www.npmjs.com/package/mcp-remote) 브리지를 통해 등록한다. 설정 파일 위치는 macOS 기준 `~/Library/Application Support/Claude/claude_desktop_config.json`, Windows 기준 `%APPDATA%\Claude\claude_desktop_config.json`이다.
 
-## MCP 클라이언트 연결 예시
+```json
+{
+  "mcpServers": {
+    "seoul-district-air": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://seoul-district-air-mcp.fly.dev/mcp"]
+    }
+  }
+}
+```
 
-누구나 별도 인증키 없이 아래 URL만 MCP 클라이언트에 등록하면 바로 쓸 수 있다. 서울 열린데이터광장 API 인증키는 서버 운영자가 `fly secrets`로 서버에만 심어두므로, 클라이언트(시민)는 발급도 입력도 필요 없다.
+파일 저장 후 Claude Desktop을 재시작하면 도구 목록에 `get_district_air_quality`가 나타난다.
+
+### Claude Code / 원격 HTTP 전송을 직접 지원하는 클라이언트
+
+Streamable HTTP를 네이티브로 지원하는 클라이언트(Claude Code 등)는 브리지 없이 URL을 바로 등록할 수 있다.
+
+```bash
+claude mcp add --transport http seoul-district-air https://seoul-district-air-mcp.fly.dev/mcp
+```
+
+또는 설정 파일에 직접 등록:
 
 ```json
 {
@@ -46,11 +64,32 @@ MCP SDK의 **Streamable HTTP** 전송(`StreamableHTTPServerTransport`)을 사용
 }
 ```
 
-## fly.io 배포
+## 개발자용 — 직접 호스팅하고 싶은 경우
+
+자체 인프라에 배포하거나 로컬에서 직접 실행/수정하고 싶다면 아래 순서를 따른다.
+
+### 전송 방식
+
+MCP SDK의 **Streamable HTTP** 전송(`StreamableHTTPServerTransport`)을 사용한다. 인증 없는 공개 stateless 서버로, 요청마다 서버/트랜스포트를 새로 생성해 세션 상태를 갖지 않는다.
+
+- MCP 엔드포인트: `POST /mcp`
+- 헬스체크: `GET /health`
+- 리스닝 포트: `PORT` 환경변수 (기본값 8080)
+
+### 로컬 설정
+
+1. `.env.example`을 `.env`로 복사하고 `SEOUL_API_KEY`에 발급받은 서울 열린데이터광장 인증키를 입력한다.
+2. 의존성 설치: `npm install`
+3. 빌드: `npm run build`
+4. 실행: `npm start` (또는 개발 중에는 `npm run dev`)
+
+`.env`는 `.gitignore`에 포함되어 저장소에 커밋되지 않는다. 로컬에서 실행한 서버는 `http://localhost:8080/mcp`로 접속한다.
+
+### fly.io 배포
 
 Node 기반 멀티스테이지 `Dockerfile`과 `fly.toml`이 저장소에 포함되어 있다. 앱 이름은 `seoul-district-air-mcp`, 서버는 `PORT` 환경변수를 읽어 리스닝한다. 인증 없이 공개로 연다.
 
-### 최초 배포
+#### 최초 배포
 
 ```bash
 fly launch --no-deploy   # fly.toml이 이미 있으므로 앱만 생성, 기존 설정 유지
@@ -58,20 +97,20 @@ fly secrets set SEOUL_API_KEY=발급받은_인증키
 fly deploy
 ```
 
-### 재배포 (코드 변경 후)
+#### 재배포 (코드 변경 후)
 
 ```bash
 fly deploy
 ```
 
-### 로그 / 상태 확인
+#### 로그 / 상태 확인
 
 ```bash
 fly logs
 fly status
 ```
 
-### 시크릿 갱신
+#### 시크릿 갱신
 
 ```bash
 fly secrets set SEOUL_API_KEY=새_인증키
