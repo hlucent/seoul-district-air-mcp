@@ -48,11 +48,11 @@ export async function fetchDistrictAirQuality(apiKey: string): Promise<DistrictA
   const topResult = data.RESULT as { CODE?: string; MESSAGE?: string } | undefined;
   const result = body?.RESULT ?? topResult;
 
+  // rate limit(ERROR-336 등 3xx)을 포함한 모든 API 에러 코드를 동일하게 단순화한다.
+  // 인증키 오류(ERROR-4xx) 등 원문 메시지에는 서버 내부 사정(발급키 상태 등)이
+  // 드러날 수 있어 시민에게 그대로 노출하지 않는다.
   if (result?.CODE && !result.CODE.startsWith("INFO-0")) {
-    if (/^ERROR-(3|5|6)\d\d/.test(result.CODE)) {
-      throw new SeoulApiError("일시적 오류, 잠시 후 재시도해주세요.");
-    }
-    throw new SeoulApiError(result.MESSAGE ?? "일시적 오류, 잠시 후 재시도해주세요.");
+    throw new SeoulApiError("일시적 오류, 잠시 후 재시도해주세요.");
   }
 
   if (!body?.row || body.row.length === 0) {
