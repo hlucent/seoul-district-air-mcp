@@ -15,7 +15,15 @@
 
 개별 오염물질 등급은 API가 제공하지 않아 환경부 통합대기환경지수(CAI) 항목별 등급 기준을 코드(`src/grades.ts`)에 상수로 고정해 계산한다.
 
-## 설정
+## 전송 방식
+
+MCP SDK의 **Streamable HTTP** 전송(`StreamableHTTPServerTransport`)을 사용한다. 인증 없는 공개 stateless 서버로, 요청마다 서버/트랜스포트를 새로 생성해 세션 상태를 갖지 않는다.
+
+- MCP 엔드포인트: `POST /mcp`
+- 헬스체크: `GET /health`
+- 리스닝 포트: `PORT` 환경변수 (기본값 8080)
+
+## 로컬 설정
 
 1. `.env.example`을 `.env`로 복사하고 `SEOUL_API_KEY`에 발급받은 서울 열린데이터광장 인증키를 입력한다.
 2. 의존성 설치: `npm install`
@@ -26,19 +34,50 @@
 
 ## MCP 클라이언트 연결 예시
 
+Streamable HTTP를 지원하는 클라이언트에서 서버 URL(`http://localhost:8080/mcp` 또는 배포된 주소)을 등록하면 된다. 예:
+
 ```json
 {
   "mcpServers": {
     "seoul-district-air": {
-      "command": "node",
-      "args": ["/path/to/seoul-district-air-mcp/dist/index.js"],
-      "env": {
-        "SEOUL_API_KEY": "발급받은_인증키"
-      }
+      "url": "https://seoul-district-air-mcp.fly.dev/mcp"
     }
   }
 }
 ```
+
+## fly.io 배포
+
+Node 기반 멀티스테이지 `Dockerfile`과 `fly.toml`이 저장소에 포함되어 있다. 앱 이름은 `seoul-district-air-mcp`, 서버는 `PORT` 환경변수를 읽어 리스닝한다. 인증 없이 공개로 연다.
+
+### 최초 배포
+
+```bash
+fly launch --no-deploy   # fly.toml이 이미 있으므로 앱만 생성, 기존 설정 유지
+fly secrets set SEOUL_API_KEY=발급받은_인증키
+fly deploy
+```
+
+### 재배포 (코드 변경 후)
+
+```bash
+fly deploy
+```
+
+### 로그 / 상태 확인
+
+```bash
+fly logs
+fly status
+```
+
+### 시크릿 갱신
+
+```bash
+fly secrets set SEOUL_API_KEY=새_인증키
+```
+
+`SEOUL_API_KEY`는 코드에 하드코딩하지 않고 `fly secrets`로만 주입한다.
 
 ## 범위
 
