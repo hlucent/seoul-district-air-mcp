@@ -3,6 +3,7 @@ import "dotenv/config";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { createMcpServer } from "./server.js";
+import { checkRateLimit } from "./rateLimit.js";
 
 const apiKey = process.env.SEOUL_API_KEY;
 if (!apiKey) {
@@ -11,6 +12,14 @@ if (!apiKey) {
 }
 
 const PORT = Number(process.env.PORT) || 8080;
+
+function getClientIp(req: IncomingMessage): string {
+  const forwarded = req.headers["x-forwarded-for"];
+  if (typeof forwarded === "string" && forwarded.length > 0) {
+    return forwarded.split(",")[0].trim();
+  }
+  return req.socket.remoteAddress ?? "unknown";
+}
 
 async function readBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
@@ -57,6 +66,12 @@ const httpServer = createServer((req, res) => {
   }
 
   if (url.pathname === "/mcp") {
+    const { allowed } = checkRateLimit(getClientIp(req));
+    if (!allowed) {
+      res.writeHead(429, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "요청이 많습니다. 잠시 후 다시 시도해주세요." }));
+      return;
+    }
     void handleMcpRequest(req, res);
     return;
   }
